@@ -3,8 +3,9 @@ from dataclasses import dataclass
 
 
 class Valorant:
-    def __init__(self, data: dict):
+    def __init__(self, data: dict, blacklist: list):
         self.__data = data
+        self.__blacklist = blacklist
 
     @dataclass
     class __AccountInfo:
@@ -20,15 +21,21 @@ class Valorant:
         knifes: list
         knifes_count: int
 
-    @staticmethod
-    def __validate(item: dict) -> bool:
+    @dataclass
+    class ValidAccount:
+        id: str
+        price: int
+        title: str
+        description: str
+
+    def __validate(self, item: dict) -> bool:
         region: str = item.get("valorant_region")
+        item_id: str = item.get("item_id")
         weapons: list = item.get("valorantInventory").get("WeaponSkins")
 
-        if region not in config.valorant_data.regions:
-            return False
-
-        if weapons is None:
+        if (region not in config.valorant_data.regions) and \
+                (weapons is None) and \
+                (item_id in self.__blacklist):
             return False
 
         for weapon in weapons:
@@ -87,13 +94,16 @@ class Valorant:
 
         return text
 
-    def start(self):
+    def check(self) -> list:
         accounts: dict = self.__data.get("data")
         items: list = accounts.get("items")
 
+        valid_items = list()
         for item in items:
+
             if not self.__validate(item):
                 continue
+
             print("Found needed account")
 
             inventory = item.get("valorantInventory")
@@ -142,7 +152,8 @@ class Valorant:
 
             rank = "Без ранга" if item.get("valorantRankTitle") not in config.valorant_data.ranks else item.get(
                 "valorantRankTitle")
-            prev_rank = "Без ранга" if item.get("valorantLastRankTitle") not in config.valorant_data.ranks else item.get(
+            prev_rank = "Без ранга" if item.get(
+                "valorantLastRankTitle") not in config.valorant_data.ranks else item.get(
                 "valorantLastRankTitle")
             level = item.get("valorant_level")
             agents_count = item.get("valorant_agent_count")
@@ -166,7 +177,17 @@ class Valorant:
                 knifes_count=knifes_count
             )
 
+            item_id = item.get("item_id")
             title = self.__create_title(account_info)
             description = self.__create_description(account_info)
 
-            print(title)
+            valid_item = self.ValidAccount(
+                id=item_id,
+                price=price,
+                title=title,
+                description=description
+            )
+
+            valid_items.append(valid_item)
+
+        return valid_items
